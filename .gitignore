@@ -1,0 +1,13 @@
+# Ignore everything
+*
+
+# Allow directory traversal
+!*/
+
+# Keep repository metadata
+!.gitignore
+!README.md
+!LICENSE
+
+# Keep all .gitkeep files
+!.gitkeep
