@@ -15,6 +15,11 @@
 !README.md
 !LICENSE
 !.github/
+!CMakeLists.txt
+
+# src 
+!src/
+!src/CMakeLists.txt
 
 # docs (source files only)
 !docs/

@@ -78,6 +78,16 @@ Core focus areas include:
 
 ---
 
+## External Dependencies
+
+This project uses the Simulation of Urban MObility (SUMO) traffic simulator for microscopic mobility simulation and trajectory generation.
+
+SUMO is an open-source, microscopic traffic simulation framework developed by the Institute of Transportation Systems at the German Aerospace Center (DLR).
+
+If you use SUMO in research, please cite:
+
+P. Alvarez Lopez et al., "Microscopic Traffic Simulation using SUMO", IEEE Intelligent Transportation Systems Conference (ITSC), 2018.
+
 ## License
 
 This project is licensed under the Apache License 2.0.  
