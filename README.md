@@ -1,5 +1,7 @@
 # Trajectory Privacy Pipeline
 
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://jay-a.github.io/trajectoryprivacypipeline/)
+
 A configuration-driven framework for privacy-preserving mobility trajectory processing.  
 The system is designed around a layered architecture consisting of a control plane, execution engine, and modular compute operators for spatial processing, Local Differential Privacy (LDP), and statistical evaluation.
 
