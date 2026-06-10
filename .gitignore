@@ -1,13 +1,39 @@
-# Ignore everything
+# -------------------------
+# Deny everything by default
+# -------------------------
 *
 
-# Allow directory traversal
+# -------------------------
+# Allow structure traversal
+# -------------------------
 !*/
 
-# Keep repository metadata
+# -------------------------
+# Explicit allowlist (source of truth)
+# -------------------------
 !.gitignore
 !README.md
 !LICENSE
+!.github/
 
-# Keep all .gitkeep files
-!.gitkeep
+# docs (source files only)
+!docs/
+!docs/sphinx/
+!docs/sphinx/**
+!docs/latex/
+!docs/latex/**
+!docs/figs/
+!docs/figs/**
+!docs/Doxyfile
+
+# GitHub Actions
+!.github/workflows/
+!.github/workflows/**
+
+# -------------------------
+# Explicitly deny generated artifacts
+# -------------------------
+docs/build/
+docs/_build/
+docs/_site/
+docs/doxygen/
