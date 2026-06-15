@@ -1,4 +1,10 @@
-#!/usr/bin/env python3
+# ---------------------------------------------------
+# Mobility LDP Analysis Toolkit
+# xml2duckdb.py
+#
+# Author: Jay M. Appleton
+# License: Apache-2.0
+# ---------------------------------------------------
 
 import argparse
 import duckdb

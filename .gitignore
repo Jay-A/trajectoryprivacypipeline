@@ -38,6 +38,12 @@ externals/**
 # src 
 !src/
 !src/CMakeLists.txt
+!src/utils/
+!src/utils/ldp_tools_python/
+!src/utils/ldp_tools_python/ldp_core.py
+!src/utils/ldp_tools_python/mobility.py
+!src/utils/ldp_tools_python/evaluation.py
+# !src/utils/ldp_tools_python/run_experiment.py
 
 # docs (source files only)
 !docs/

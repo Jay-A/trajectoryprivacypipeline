@@ -1,3 +1,11 @@
+# ---------------------------------------------------
+# Mobility LDP Analysis Toolkit
+# build_state_space.py
+#
+# Author: Jay M. Appleton
+# License: Apache-2.0
+# ---------------------------------------------------
+
 import argparse 
 import duckdb
 import pyproj
