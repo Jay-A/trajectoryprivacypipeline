@@ -17,6 +17,24 @@
 !.github/
 !CMakeLists.txt
 
+# concept demo
+!concept_demo/
+!concept_demo/build_occupancy_table.py
+!concept_demo/build_state_space.py
+!concept_demo/build_trajectory_transitions.py
+!concept_demo/xml2duckdb.py
+
+# external tools (installed locally, not versioned)
+externals/**
+!externals/
+!externals/sumo_target/
+!externals/sumo_target/.gitkeep
+
+# submodules (external dependencies)
+!submodules/
+!submodules/**
+!submodules/**/*
+
 # src 
 !src/
 !src/CMakeLists.txt
