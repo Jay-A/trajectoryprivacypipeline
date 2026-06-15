@@ -58,9 +58,9 @@ def parse_args():
     return parser.parse_args()
 
 def validate_time_continuity(con, table, verbose=True):
-    # ------------------------------------------------------------
-    # 1. DUPLICATE CHECK (must fail)
-    # ------------------------------------------------------------
+
+    # - DUPLICATE CHECK ------------------------------------------
+    # -   collect all veh_id, t_bin pairs, aggregate, check length > 1
     dup_keys = con.execute(f"""
         SELECT veh_id, t_bin
         FROM {table}
@@ -68,35 +68,31 @@ def validate_time_continuity(con, table, verbose=True):
         HAVING COUNT(*) > 1
     """).fetchall()
 
-    # ------------------------------------------------------------
-    # 2. DEBUG SAMPLE (optional)
-    # ------------------------------------------------------------
-    dup_sample = con.execute(f"""
-        SELECT *
-        FROM {table}
-        WHERE (veh_id, t_bin) IN (
-            SELECT veh_id, t_bin
-            FROM {table}
-            GROUP BY veh_id, t_bin
-            HAVING COUNT(*) > 1
-        )
-        ORDER BY veh_id, t_bin
-        LIMIT 50
-    """).fetchdf()
+    # # - DEBUG SAMPLE ---------------------------------------------
+    # dup_sample = con.execute(f"""
+    #     SELECT *
+    #     FROM {table}
+    #     WHERE (veh_id, t_bin) IN (
+    #         SELECT veh_id, t_bin
+    #         FROM {table}
+    #         GROUP BY veh_id, t_bin
+    #         HAVING COUNT(*) > 1
+    #     )
+    #     ORDER BY veh_id, t_bin
+    #     LIMIT 50
+    # """).fetchdf()
 
-    print(dup_sample)
+    # print(dup_sample)
 
-    # ------------------------------------------------------------
-    # 3. FAIL CONDITION
-    # ------------------------------------------------------------
+    # - FAIL CONDITION -------------------------------------------
+    # -   if any duplicated keys fail
     if len(dup_keys) > 0:
         raise ValueError(
             f"Duplicate (veh_id, t_bin) entries found: {len(dup_keys)}"
         )
 
-    # ------------------------------------------------------------
-    # 2. ORDERING CHECK (must fail)
-    # ------------------------------------------------------------
+    # - ORDERING CHECK -------------------------------------------
+    # -   each veh_id's entry list should by one time step AFTER the previous
     bad_order = con.execute(f"""
         WITH diffs AS (
             SELECT
@@ -117,9 +113,8 @@ def validate_time_continuity(con, table, verbose=True):
             f"Time ordering violation in {len(bad_order)} vehicles"
         )
 
-    # ------------------------------------------------------------
-    # 3. COVERAGE STATS (diagnostic only)
-    # ------------------------------------------------------------
+    # - COVERAGE STATS ( Markov ) --------------------------------
+    # -    if verbose dump missing time steps by veh_id, should be 0's 
     if verbose:
         stats = con.execute(f"""
             SELECT
@@ -142,43 +137,6 @@ def validate_time_continuity(con, table, verbose=True):
         print("[VALIDATION OK] Markov structure is valid (duplicates removed, ordering correct)")
 
     return True
-
-# def build_transitions(con, state_table, transition_table, args):
-#     max_gap = args.max_time_gap
-
-#     query = f"""
-#     CREATE TABLE {transition_table} AS
-#     WITH ordered AS (
-#         SELECT
-#             veh_id,
-#             t_bin,
-#             hex_id,
-#             LAG(hex_id) OVER (
-#                 PARTITION BY veh_id
-#                 ORDER BY t_bin
-#             ) AS hex_from,
-#             LAG(t_bin) OVER (
-#                 PARTITION BY veh_id
-#                 ORDER BY t_bin
-#             ) AS prev_t_bin
-#         FROM input_db.trajectory_states_r{args.res}
-#     )
-#     SELECT
-#         veh_id,
-#         t_bin AS t_bin,
-#         hex_from,
-#         hex_id AS hex_to
-#     FROM ordered
-#     WHERE
-#         hex_from IS NOT NULL
-#         AND (t_bin - prev_t_bin) <= {max_gap}
-#     """
-
-#     if args.dry_run:
-#         print(query)
-#         return
-
-#     con.execute(query)   
 
 def build_transitions(con, state_table, transition_table, args):
     max_gap = args.max_time_gap
@@ -233,25 +191,6 @@ def run_pipeline(args):
         con.execute(f"DROP TABLE IF EXISTS {transition_table}")
 
     build_transitions(con, state_table, transition_table, args)
-
-# def run_pipeline(args):
-#     con = duckdb.connect(args.output)
-#     con.execute(f"ATTACH '{args.input}' AS input_db")
-#     state_table = f"input_db.trajectory_states_r{args.res}"
-
-#     transition_table = (
-#         args.table_name
-#         or f"transitions_gap{args.max_time_gap}_r{args.res}"
-#     )
-
-#     validate_time_continuity( con, state_table, args.verbose )
-
-#     if args.drop_existing:
-#         drop_transition_table(con, transition_table)
-
-#     build_transitions(con, state_table, transition_table, args)
-
-#     return;
 
 def main():
     args = parse_args()

@@ -1,41 +1,32 @@
 import argparse
 import duckdb
 
-
-# ------------------------------------------------------------
-# CLI
-# ------------------------------------------------------------
+# - CLI ------------------------------------------------------
 def parse_args():
+    USAGE = """
+    Example usage:
+
+    python3 build_occupancy_table.py -i berlin.study.duckdb -r 8 
+    """
     parser = argparse.ArgumentParser(
-        description="Build occupancy tables from trajectory states"
-    )
+        description="Build occupancy tables from trajectory states" )
 
     parser.add_argument(
-        "-i", "--input", required=True,
-        help="Path to DuckDB database"
-    )
+        "-i", "--input", required=True, help="Path to DuckDB database" )
 
     parser.add_argument(
-        "-r", "--res", type=int, required=True,
-        help="H3 resolution (e.g. 7, 9)"
-    )
+        "-r", "--res", type=int, required=True, help="H3 resolution (e.g. 7, 9)" )
 
     parser.add_argument(
         "--drop-existing", action="store_true",
-        help="Drop existing occupancy table before rebuilding"
-    )
+        help="Drop existing occupancy table before rebuilding" )
 
     parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Print SQL instead of executing"
-    )
+        "--dry-run", action="store_true", help="Print SQL instead of executing" )
 
     return parser.parse_args()
 
-
-# ------------------------------------------------------------
-# Core builder
-# ------------------------------------------------------------
+# - Core builder ----------------------------------------------
 def build_occupancy(con, state_table, occupancy_table, args):
 
     if args.drop_existing:
@@ -58,10 +49,7 @@ def build_occupancy(con, state_table, occupancy_table, args):
 
     con.execute(query)
 
-
-# ------------------------------------------------------------
-# Pipeline runner
-# ------------------------------------------------------------
+# - Pipeline runner ------------------------------------------
 def run_pipeline(args):
 
     con = duckdb.connect(args.input)
@@ -73,14 +61,10 @@ def run_pipeline(args):
 
     print(f"[OK] Built {occupancy_table} from {state_table}")
 
-
-# ------------------------------------------------------------
-# Main
-# ------------------------------------------------------------
+# - Main -----------------------------------------------------
 def main():
     args = parse_args()
     run_pipeline(args)
-
 
 if __name__ == "__main__":
     main()

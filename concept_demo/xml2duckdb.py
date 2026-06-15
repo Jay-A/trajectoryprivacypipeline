@@ -139,6 +139,5 @@ def main():
 
     print("Done. Base DuckDB created.")
 
-
 if __name__ == "__main__":
     main()

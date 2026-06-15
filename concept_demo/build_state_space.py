@@ -64,26 +64,20 @@ def ensure_trajectory_states_r9(con):
     import h3
     import pyarrow as pa
 
-    # --------------------------------------------------
-    # 0. LOAD RAW SUMO DATA (local coords)
-    # --------------------------------------------------
+    # - LOAD RAW SUMO DATA (local coords) --------------
     df = con.execute("""
         SELECT veh_id, time, x, y, speed
         FROM input_db.fcd_segmented
     """).fetchdf()
 
-    # --------------------------------------------------
-    # 1. APPLY NET OFFSET (CRITICAL — FIXES "OCEAN BUG")
-    # --------------------------------------------------
+    # - APPLY NET OFFSET -------------------------------
     NET_X = 363050.47
     NET_Y = 5798536.79
 
     df["x"] = df["x"] + NET_X
     df["y"] = df["y"] + NET_Y
 
-    # --------------------------------------------------
-    # 2. UTM → WGS84
-    # --------------------------------------------------
+    # - UTM → WGS84 ------------------------------------
     to_latlon = pyproj.Transformer.from_crs(
         "EPSG:32633",
         "EPSG:4326",
@@ -92,9 +86,7 @@ def ensure_trajectory_states_r9(con):
 
     lon, lat = to_latlon.transform(df["x"].values, df["y"].values)
 
-    # --------------------------------------------------
-    # 3. H3 encoding (r9 canonical)
-    # --------------------------------------------------
+    # - H3 encoding (r9 default) -----------------------
     df["hex_id"] = [
         str(h3.latlng_to_cell(lat_i, lon_i, 9))
         for lat_i, lon_i in zip(lat, lon)
@@ -201,43 +193,26 @@ def run_pipeline(args):
 
     con = duckdb.connect(args.output)
 
-    # --------------------------------------------------
-    # 1. ATTACH FIRST (critical fix)
-    # --------------------------------------------------
+    # - ATTACH args.input ------------------------------
     con.execute(f"ATTACH '{args.input}' AS input_db")
 
-    # --------------------------------------------------
-    # 2. Ensure canonical spatial layer exists (r9)
-    # --------------------------------------------------
+    # - Ensure default table (r9) ----------------------
     base_table = ensure_trajectory_states_r9(con)
 
-    # --------------------------------------------------
-    # 3. State table naming
-    # --------------------------------------------------
+    # - Name state table -------------------------------
     table_name = f"trajectory_states_r{args.res}"
     metadata_table = f"state_metadata_r{args.res}"
 
-    # --------------------------------------------------
-    # 4. overwrite safety
-    # --------------------------------------------------
+    # - overwrite --------------------------------------
     if args.overwrite:
         con.execute(f"DROP TABLE IF EXISTS {table_name}")
         con.execute(f"DROP TABLE IF EXISTS {metadata_table}")
 
-    # --------------------------------------------------
-    # 5. NO schema probing needed anymore
-    #    (base is guaranteed)
-    # --------------------------------------------------
-
-    # --------------------------------------------------
-    # 6. FIXED state query inputs
-    # --------------------------------------------------
+    # - define queries ---------------------------------
     query = build_state_query(args, table_name, base_table, "hex_id")
     con.execute(query)
 
-    # --------------------------------------------------
-    # 7b. SANITY CHECK: verify final state table schema
-    # --------------------------------------------------
+    # - SANITY CHECK -----------------------------------
     schema_df = con.execute(f"""
         DESCRIBE {table_name}
     """).fetchdf()
@@ -253,9 +228,7 @@ def run_pipeline(args):
     if hex_type != "VARCHAR":
         raise ValueError(f"Unexpected hex_id type: {hex_type}")
 
-    # --------------------------------------------------
-    # 7. metadata
-    # --------------------------------------------------
+    # - append  metadata -------------------------------
     con.execute(f"""
         CREATE TABLE {metadata_table} AS
         SELECT
@@ -270,9 +243,7 @@ def run_pipeline(args):
         base_table
     ])
 
-    # --------------------------------------------------
-    # 8. sanity stats
-    # --------------------------------------------------
+    # - more sanity stuff ------------------------------
     stats = con.execute(f"""
         SELECT
             COUNT(*) AS n_rows,
@@ -284,6 +255,7 @@ def run_pipeline(args):
     print(stats)
 
     con.close()
+    
 def main():
 	args = parse_args()
 	run_pipeline(args)
