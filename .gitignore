@@ -16,6 +16,7 @@
 !LICENSE
 !.github/
 !CMakeLists.txt
+!requirements.txt
 
 # concept demo
 !concept_demo/
@@ -23,6 +24,7 @@
 !concept_demo/build_state_space.py
 !concept_demo/build_trajectory_transitions.py
 !concept_demo/xml2duckdb.py
+!concept_demo/filter_database_by_vehid.py
 
 # external tools (installed locally, not versioned)
 externals/**

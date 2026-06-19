@@ -1,0 +1,9 @@
+numpy==1.26.4
+duckdb
+matplotlib
+pyproj
+pandas
+h3==4.5.0
+shapely
+pyarrow>=14
+scipy

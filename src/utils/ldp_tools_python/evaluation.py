@@ -319,6 +319,7 @@ def run_sweeps(
     df_states,
     neighbor_map,
     epsilons,
+    seeds,
     apply_ldp,
     compute_occupancy,
     compute_transitions,
@@ -333,113 +334,168 @@ def run_sweeps(
 ):
     """
     Full LDP experiment sweep over epsilon values.
+    Returns:
+        - results_df: STRICT scalar-only metrics (CSV-safe)
+        - artifacts: full fidelity experimental outputs
     """
 
-    results = []
-    artifacts = []   # NEW
+    import numpy as np
+    import pandas as pd
 
-    # - baseline --------------------------------------
+    # ----------------------------
+    # helper: keep only scalars
+    # ----------------------------
+    def to_scalar(v):
+        if isinstance(v, (np.generic,)):
+            return v.item()
+        if isinstance(v, (int, float, bool)):
+            return v
+        return None  # drop anything non-scalar
+
+    def filter_scalars(d):
+        return {k: to_scalar(v) for k, v in d.items() if to_scalar(v) is not None}
+
+    results = []
+
+    # - baseline -----------------
     occ_true = compute_occupancy(df_states)
     trans_true = compute_transitions(df_states)
     kernel_true = compute_markov_kernel(trans_true)
     ent_true = compute_entropy(occ_true)
     hot_true = get_topk_hotspots(occ_true, k=10)
 
-    # - sweep over privacy budgets --------------------
+    # - artifacts ----------------
+    artifacts = {
+        "true_states": df_states,
+        "trans_true": trans_true,
+        "occ_true": occ_true,
+        "kernel_true": kernel_true,
+        "runs": []
+    }
+
+    # - sweep --------------------
     for eps in epsilons:
+        for seed in seeds:
 
-        # 1. apply LDP
-        df_ldp = apply_ldp(df_states, neighbor_map, epsilon=eps)
+            # 1. LDP sample
+            df_ldp = apply_ldp(df_states, neighbor_map, eps, seed)
 
-        # 2. recompute mobility structures
-        occ_ldp = compute_occupancy(df_ldp)
-        trans_ldp = compute_transitions(df_ldp)
-        kernel_ldp = compute_markov_kernel(trans_ldp)
-        ent_ldp = compute_entropy(occ_ldp)
-        hot_ldp = get_topk_hotspots(occ_ldp, k=10)
+            # 2. recompute structures
+            occ_ldp = compute_occupancy(df_ldp)
+            trans_ldp = compute_transitions(df_ldp)
+            kernel_ldp = compute_markov_kernel(trans_ldp)
+            hot_ldp = get_topk_hotspots(occ_ldp, k=10)
 
-        # 3. evaluate
-        occ_metrics = compare_occupancy(occ_true, occ_ldp)
-        trans_metrics = compare_transitions(trans_true, trans_ldp)
-        kernel_metrics = compare_kernels(kernel_true, kernel_ldp)
-        hot_metrics = compare_hotspots(hot_true, hot_ldp)
+            # 3. compute comparisons
+            occ_metrics = compare_occupancy(occ_true, occ_ldp)
+            trans_metrics = compare_transitions(trans_true, trans_ldp)
+            kernel_metrics = compare_kernels(kernel_true, kernel_ldp)
+            hot_metrics = compare_hotspots(hot_true, hot_ldp)
 
-        # 4. aggregate metrics
-        row = {
-            "epsilon": eps,
-            **occ_metrics,
-            **trans_metrics,
-            **kernel_metrics,
-            **hot_metrics,
-        }
+            # 4. STRICT scalar filtering (core fix)
+            row = {
+                "epsilon": eps,
+                "seed": seed,
+                **filter_scalars(occ_metrics),
+                **filter_scalars(trans_metrics),
+                **filter_scalars(kernel_metrics),
+                **filter_scalars(hot_metrics),
+            }
 
-        results.append(row)
+            results.append(row)
 
-        # NEW: store artifacts for plotting
-        artifacts.append({
-            "epsilon": eps,
-            "true_states": df_states,
-            "ldp_states": df_ldp,
-            "trans_true": trans_true,
-            "trans_ldp": trans_ldp
-        })
+            # 5. full artifacts (unchanged, safe)
+            artifacts["runs"].append({
+                "epsilon": eps,
+                "seed": seed,
+                "ldp_states": df_ldp,
+                "occ_ldp": occ_ldp,
+                "trans_ldp": trans_ldp,
+                "kernel_ldp": kernel_ldp,
+                "hot_ldp": hot_ldp
+            })
 
     return pd.DataFrame(results), artifacts
 
 def save_results(
     results_df,
+    seed_results_df=None,
     out_dir="results_ldp_experiment",
-    filename_prefix="ldp_mobility",
-    duckdb_path=None,
-    table_name="ldp_results"
+    filename_prefix="ldp_mobility"
 ):
     """
-    Save experiment results in a reproducible format.
+    Save LDP experiment results in analysis-ready CSV format.
+
+    This version ENFORCES scalar-only CSV outputs.
+    Any non-scalar values are removed or converted.
     """
 
-    # - create output directory -----------------------
-    os.makedirs(out_dir, exist_ok=True)
+    import os
+    import json
+    import numpy as np
+    import pandas as pd
+    from datetime import datetime
 
+    os.makedirs(out_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # - save CSV --------------------------------------
-    csv_path = os.path.join(
-        out_dir,
-        f"{filename_prefix}_{timestamp}.csv"
-    )
-    results_df.to_csv(csv_path, index=False)
+    # - scalar safety ---------------------------------
+    def to_scalar(v):
+        if isinstance(v, (np.generic,)):
+            return v.item()
+        if isinstance(v, (int, float, bool, str)):
+            return v
+        return None  # drop non-scalars
 
-    # - save metadata ---------------------------------
+    def sanitize_df(df):
+        df = df.copy()
+        for col in df.columns:
+            df[col] = df[col].apply(to_scalar)
+        return df
+
+    # - 0. SANITIZE INPUTS ----------------------------
+    results_df_clean = sanitize_df(results_df)
+
+    seed_results_df_clean = (
+        sanitize_df(seed_results_df) if seed_results_df is not None else None
+    )
+
+    # - 1. EPSILON-LEVEL SUMMARY ----------------------
+    summary_path = os.path.join(
+        out_dir,
+        f"{filename_prefix}_summary_{timestamp}.csv"
+    )
+    results_df_clean.to_csv(summary_path, index=False)
+
+    # - 2. SEED-LEVEL RESULTS -------------------------
+    seed_path = None
+    if seed_results_df_clean is not None:
+        seed_path = os.path.join(
+            out_dir,
+            f"{filename_prefix}_seed_level_{timestamp}.csv"
+        )
+        seed_results_df_clean.to_csv(seed_path, index=False)
+
+    # - 3. METADATA -----------------------------------
     metadata = {
         "timestamp": timestamp,
-        "rows": len(results_df),
-        "columns": list(results_df.columns),
-        "epsilons": sorted(results_df["epsilon"].unique().tolist())
+        "summary_rows": len(results_df_clean),
+        "seed_rows": len(seed_results_df_clean) if seed_results_df_clean is not None else 0,
+        "epsilons": sorted(results_df_clean["epsilon"].dropna().unique().tolist()),
+        "has_seed_level": seed_results_df_clean is not None
     }
 
     meta_path = os.path.join(
         out_dir,
-        f"{filename_prefix}_{timestamp}_meta.json"
+        f"{filename_prefix}_meta_{timestamp}.json"
     )
 
     with open(meta_path, "w") as f:
         json.dump(metadata, f, indent=2)
 
-    # - optionally persist into DuckDB ----------------
-    db_path = None
-    if duckdb_path is not None:
-        con = duckdb.connect(duckdb_path)
-
-        con.execute(f"DROP TABLE IF EXISTS {table_name}")
-        con.register("tmp_df", results_df)
-        con.execute(f"CREATE TABLE {table_name} AS SELECT * FROM tmp_df")
-
-        db_path = duckdb_path
-
-    # - return paths ----------------------------------
+    # - 4. RETURN PATHS--------------------------------
     return {
-        "csv": csv_path,
-        "meta": meta_path,
-        "database": db_path,
-        "table": table_name if duckdb_path else None
+        "summary_csv": summary_path,
+        "seed_csv": seed_path,
+        "meta_json": meta_path
     }
